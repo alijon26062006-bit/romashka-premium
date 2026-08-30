@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#fffaf6">
+<meta name="description" content="Ромашка — цветочный магазин в Душанбе. Свежие букеты, композиции и доставка.">
+<title>Ромашка — цветы с любовью</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="topline"><span>Свежие цветы каждый день</span><span class="topline-sep">•</span><span>Доставка по Душанбе</span><span class="topline-right">Ежедневно 08:00–22:00</span></div>
+
+<header class="header">
+  <a class="brand" href="/" aria-label="Ромашка — на главную">
+    <span class="brand-mark"><span>✿</span></span><span class="brand-copy"><b>Ромашка</b><small>цветочный магазин</small></span>
+  </a>
+  <nav class="main-nav" aria-label="Основная навигация">
+    <a class="active" href="/">Главная</a><a href="#catalog">Каталог</a><a href="#about">О нас</a><a href="#delivery">Доставка</a><a href="#contacts">Контакты</a>
+  </nav>
+  <div class="header-actions">
+    <a class="contact-mini" id="phoneLink" href="#" target="_blank" rel="noopener"><span class="wa-mini">◉</span><span><b>+992 900 000 000</b><small>Ежедневно с 08:00 до 22:00</small></span></a>
+    <button class="icon-btn" aria-label="Поиск" id="searchBtn">⌕</button>
+    <button class="icon-btn bag-btn" aria-label="Корзина" id="cartBtn">♡<i id="cartCount">0</i></button>
+  </div>
+</header>
+
+<main>
+<section class="hero">
+  <div class="hero-copy">
+    <div class="eyebrow-pill">СВЕЖИЕ ЦВЕТЫ КАЖДЫЙ ДЕНЬ</div>
+    <h1>Дарите эмоции<br><em>с любовью ♡</em></h1>
+    <p>Роскошные букеты для самых важных моментов.<br>Быстрая доставка по Душанбе.</p>
+    <div class="hero-actions">
+      <a href="#catalog" class="btn btn-primary">Смотреть каталог <span>❀</span></a>
+      <a id="heroWhatsApp" href="#" class="btn btn-outline"><span class="wa-symbol">◉</span> Заказать в WhatsApp</a>
+    </div>
+    <div class="hero-benefits">
+      <div><span>❀</span><p><b>Свежие цветы</b><small>каждый день</small></p></div>
+      <div><span>▣</span><p><b>Быстрая доставка</b><small>по Душанбе</small></p></div>
+      <div><span>♡</span><p><b>100% качество</b><small>гарантируем</small></p></div>
+      <div><span>♧</span><p><b>Фото перед доставкой</b><small>для вашего спокойствия</small></p></div>
+    </div>
+  </div>
+  <div class="hero-visual">
+    <div class="hero-photo"><img src="https://images.unsplash.com/photo-1523438885200-e635ba2c371e?auto=format&fit=crop&w=1500&q=92" alt="Нежная цветочная композиция"></div>
+    <div class="hero-badge"><span>ROMASHKA</span><b>Цветы<br>с душой</b></div>
+    <div class="hero-decor">♡</div>
+  </div>
+</section>
+
+<section class="category-section">
+  <div class="section-title centered"><span class="eyebrow">ВЫБЕРИТЕ СВОЁ</span><h2>Популярные категории</h2><div class="ornament">— ❀ —</div></div>
+  <div class="category-grid" id="categoryGrid"></div>
+</section>
+
+<section class="catalog section" id="catalog">
+  <div class="section-head"><div><span class="eyebrow">НАША КОЛЛЕКЦИЯ</span><h2>Популярные букеты</h2><div class="ornament left">— ❀ —</div></div><p>Выбирайте готовую композицию или напишите нам — соберём букет специально для вас.</p></div>
+  <div class="catalog-toolbar"><div class="filters" id="filters"></div><div class="catalog-count" id="catalogCount"></div></div>
+  <div class="product-grid" id="productGrid"><div class="loading">Загружаем свежие букеты...</div></div>
+</section>
+
+<section class="story section" id="about">
+  <div class="story-photo"><img src="https://images.unsplash.com/photo-1495231916356-a86217efff12?auto=format&fit=crop&w=1200&q=90" alt="Цветы Ромашка"></div>
+  <div class="story-copy"><span class="eyebrow">О МАГАЗИНЕ</span><h2>Красота, которую<br><em>хочется подарить.</em></h2><p>Мы верим, что цветы умеют говорить без слов. Поэтому каждый букет собираем вручную из свежих цветов, уделяя внимание форме, цвету и каждой детали упаковки.</p><div class="stats"><div><b>Fresh</b><span>свежие цветы</span></div><div><b>Care</b><span>ручная сборка</span></div><div><b>Fast</b><span>быстрая доставка</span></div></div></div>
+</section>
+
+<section class="service-section" id="delivery">
+  <div class="section-title centered"><span class="eyebrow">ПОЧЕМУ НАС ВЫБИРАЮТ</span><h2>Всё для красивого подарка</h2></div>
+  <div class="service-grid"><article><span>01</span><h3>Свежесть</h3><p>Отбираем цветы каждый день и собираем заказ непосредственно перед доставкой.</p></article><article><span>02</span><h3>Забота</h3><p>Помогаем подобрать композицию под повод, бюджет и настроение.</p></article><article><span>03</span><h3>Доставка</h3><p>Бережно доставляем букеты по Душанбе и заранее согласовываем детали.</p></article></div>
+</section>
+
+<section class="cta" id="contacts"><div><span class="eyebrow">БУДЕМ РАДЫ ПОМОЧЬ</span><h2>Не знаете, что выбрать?</h2><p>Напишите нам в WhatsApp — подберём цветы и оформим заказ за несколько минут.</p></div><a id="ctaWhatsApp" href="#" class="btn btn-white"><span class="wa-symbol">◉</span> Написать в WhatsApp</a></section>
+</main>
+
+<footer class="footer">
+  <div class="footer-brand"><a class="brand" href="/"><span class="brand-mark"><span>✿</span></span><span class="brand-copy"><b>Ромашка</b><small>цветочный магазин</small></span></a><p>Дарите эмоции с любовью ♡</p></div>
+  <div class="footer-links"><div><b>Магазин</b><a href="#catalog">Каталог</a><a href="#about">О нас</a><a href="#delivery">Доставка</a></div><div><b>Помощь</b><a href="#contacts">Контакты</a><a href="/admin.html">Админ-панель</a></div></div>
+  <div class="footer-bottom"><span>© 2026 Ромашка. Все права защищены.</span><span>Сделано с любовью ♡</span></div>
+</footer>
+
+<div class="search-drawer" id="searchDrawer" aria-hidden="true"><div class="search-inner"><button class="close-btn" id="closeSearch">×</button><span>ПОИСК ПО КАТАЛОГУ</span><input id="searchInput" placeholder="Например, пионы или розы…" autocomplete="off"></div></div>
+<div class="cart-overlay" id="cartOverlay"></div>
+<aside class="cart-drawer" id="cartDrawer" aria-label="Корзина"><div class="cart-head"><div><span class="eyebrow">ВАШ ЗАКАЗ</span><h2>Корзина</h2></div><button class="close-btn" id="closeCart">×</button></div><div class="cart-items" id="cartItems"></div><div class="cart-foot"><div class="cart-total"><span>Итого</span><b id="cartTotal">0 сомони</b></div><button class="btn btn-primary full" id="checkoutBtn">Оформить заказ <span>→</span></button><a class="cart-wa" id="cartWhatsApp" href="#" target="_blank" rel="noopener">Заказать через WhatsApp</a></div></aside>
+<div class="toast" id="toast"></div>
+<div class="floating-wa"><a id="floatingWhatsApp" href="#" target="_blank" rel="noopener" aria-label="WhatsApp">◉</a></div>
+<script src="/app.js"></script>
+</body>
+</html>

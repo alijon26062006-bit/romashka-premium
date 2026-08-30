@@ -1,0 +1,15 @@
+{
+  "name": "romashka-premium-flower-shop",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Premium flower shop catalog with WhatsApp ordering and admin panel",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "multer": "^2.0.2"
+  }
+}

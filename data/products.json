@@ -1,0 +1,79 @@
+[
+  {
+    "id": 1788112315703,
+    "name": "Простая",
+    "category": "Букеты",
+    "price": 12,
+    "description": "простой красивая ромашка",
+    "composition": "упаковка",
+    "size": "",
+    "image": "/uploads/1788112315493-kh6nxm4c.jpg",
+    "available": true
+  },
+  {
+    "id": 1788112218438,
+    "name": "Ромашка ",
+    "category": "Ромашки",
+    "price": 1,
+    "description": "Очень красивая и есть много для вас",
+    "composition": "Ромашка",
+    "size": "10",
+    "image": "https://avatars.mds.yandex.net/i?id=72c99c84e6c8b6aba134be771496a796_l-5865525-images-thumbs&n=13",
+    "available": true
+  },
+  {
+    "id": 2,
+    "name": "Розовая мечта",
+    "category": "Розы",
+    "price": 280,
+    "description": "Элегантная композиция из нежно-розовых роз для романтичного и красивого подарка.",
+    "composition": "Розовые розы, зелень, дизайнерская упаковка",
+    "size": "Средний",
+    "image": "https://images.unsplash.com/photo-1490750967868-88aa4486c946?auto=format&fit=crop&w=1200&q=88",
+    "available": true
+  },
+  {
+    "id": 3,
+    "name": "Белая классика",
+    "category": "Букеты",
+    "price": 240,
+    "description": "Минималистичный светлый букет, который подойдёт для дня рождения, встречи или важного события.",
+    "composition": "Белые цветы, эвкалипт, зелень",
+    "size": "Средний",
+    "image": "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?auto=format&fit=crop&w=1200&q=88",
+    "available": true
+  },
+  {
+    "id": 4,
+    "name": "Весенний сад",
+    "category": "Букеты",
+    "price": 320,
+    "description": "Яркая сезонная композиция с живой зеленью и лёгким весенним настроением.",
+    "composition": "Сезонные цветы, зелень, лента",
+    "size": "Большой",
+    "image": "https://images.unsplash.com/photo-1507504031003-b417219a0fde?auto=format&fit=crop&w=1200&q=88",
+    "available": true
+  },
+  {
+    "id": 5,
+    "name": "Любовь",
+    "category": "Розы",
+    "price": 450,
+    "description": "Большой букет красных роз — классический романтический подарок для особенного человека.",
+    "composition": "Красные розы, зелень, премиальная упаковка",
+    "size": "Большой",
+    "image": "https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=1200&q=88",
+    "available": true
+  },
+  {
+    "id": 6,
+    "name": "Лавандовое утро",
+    "category": "Композиции",
+    "price": 210,
+    "description": "Спокойная композиция в натуральных оттенках. Идеальна для уютного подарка без повода.",
+    "composition": "Лаванда, сухоцветы, декоративная зелень",
+    "size": "Небольшой",
+    "image": "https://images.unsplash.com/photo-1495231916356-a86217efff12?auto=format&fit=crop&w=1200&q=88",
+    "available": true
+  }
+]
