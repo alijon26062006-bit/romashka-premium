@@ -1,4 +1,4 @@
-let allProducts=[];let activeCategory='Все';let whatsappNumber='';let cart=JSON.parse(localStorage.getItem('romashka_cart')||'[]');
+let allProducts=[];let activeCategory='Все';let whatsappNumber='992901403263';let cart=JSON.parse(localStorage.getItem('romashka_cart')||'[]');
 const $=s=>document.querySelector(s);
 const money=n=>Number(n||0).toLocaleString('ru-RU')+' сомони';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));

@@ -7,7 +7,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 const SHOP_NAME = 'Ромашка';
-const WHATSAPP_NUMBER = '+992901403263'; // <-- ЗАМЕНИ на реальный номер
+const WHATSAPP_NUMBER = '992901403263';
 const ADMIN_USER = 'admin';
 const ADMIN_PASSWORD = 'admin123';
 
