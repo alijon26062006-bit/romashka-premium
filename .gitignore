@@ -1,6 +1,16 @@
 node_modules/
 .env
 .env.*
+!.env.example
+
+# Данные магазина и загруженные фото живут только на сервере
+data/
 uploads/
+*.tmp
+
+# Служебное
 .DS_Store
+Thumbs.db
 npm-debug.log*
+caddy_data/
+caddy_config/

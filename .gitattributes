@@ -1,0 +1,22 @@
+# Все текстовые файлы хранятся и выгружаются с переводами строк LF.
+# Без этого Windows-версия Git превратила бы deploy.sh в CRLF,
+# и на сервере он падал бы с ошибкой "bad interpreter".
+* text=auto eol=lf
+
+*.sh              text eol=lf
+Dockerfile        text eol=lf
+Caddyfile         text eol=lf
+docker-compose.yml text eol=lf
+*.json            text eol=lf
+*.js              text eol=lf
+*.html            text eol=lf
+*.css             text eol=lf
+*.svg             text eol=lf
+*.md              text eol=lf
+
+# Изображения не трогаем
+*.jpg  binary
+*.jpeg binary
+*.png  binary
+*.webp binary
+*.ico  binary

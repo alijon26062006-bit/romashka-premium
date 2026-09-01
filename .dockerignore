@@ -1,0 +1,12 @@
+node_modules
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+data
+uploads
+caddy_data
+caddy_config
+*.md
+*.tmp

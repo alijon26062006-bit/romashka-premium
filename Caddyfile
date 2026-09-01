@@ -1,0 +1,11 @@
+# Если в .env задан DOMAIN — Caddy сам получит бесплатный SSL-сертификат.
+# Если DOMAIN пустой — сайт работает по HTTP на 80 порту (по IP сервера).
+
+{$DOMAIN::80} {
+	encode zstd gzip
+	reverse_proxy web:3000
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	}
+}
