@@ -1,0 +1,36 @@
+# Вариант установки для сервера, где порты 80 и 443 уже занял nginx
+# (например, там уже работает другой сайт).
+#
+# Caddy здесь не используется. Приложение слушает только 127.0.0.1,
+# снаружи оно недоступно — запросы к нему проксирует существующий nginx.
+#
+# Запуск: ./deploy-nginx.sh ваш-домен
+# Вручную: docker compose -f docker-compose.nginx.yml up -d --build
+
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+    ports:
+      # Только localhost: порт наружу не открывается
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+
+  # Нужен только для DuckDNS с динамическим IP. По умолчанию не запускается.
+  duckdns:
+    image: alpine:3
+    restart: unless-stopped
+    profiles: ["duckdns"]
+    env_file: .env
+    command: >
+      sh -c "apk add --no-cache curl >/dev/null 2>&1;
+             while true; do
+               curl -fsS \"https://www.duckdns.org/update?domains=$${DUCKDNS_SUBDOMAIN}&token=$${DUCKDNS_TOKEN}&ip=\" || echo 'DuckDNS: обновить IP не удалось';
+               sleep 300;
+             done"
