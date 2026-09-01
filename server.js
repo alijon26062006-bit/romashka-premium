@@ -101,6 +101,7 @@ const {
   removeUnusedUploads
 } = require('./store');
 
+const seo = require('./seo');
 const stats = require('./stats');
 const bot = require('./bot');
 
@@ -305,11 +306,16 @@ function renderHtml(req, res, name, seo) {
     seo.image ? '<meta property="og:image:width" content="1200">' : '',
     seo.image ? '<meta property="og:image:height" content="1200">' : '',
     '<meta name="twitter:card" content="' + (seo.image ? 'summary_large_image' : 'summary') + '">',
+    seo.google ? '<meta name="google-site-verification" content="' + escapeHtml(seo.google) + '">' : '',
+    seo.yandex ? '<meta name="yandex-verification" content="' + escapeHtml(seo.yandex) + '">' : '',
     seo.jsonLd ? '<script type="application/ld+json">' + JSON.stringify(seo.jsonLd).replace(/</g, '\\u003c') + '</script>' : ''
   ].filter(Boolean).join('\n');
 
   const output = html
     .replace('<!--SEO-->', tags)
+    /* Заголовок первого уровня — сильный сигнал для поиска, а город берётся
+       из настроек. Поэтому он не вшит в разметку, а подставляется здесь. */
+    .replace('<!--H1-->', seo.heading || '')
     .replace(/__VERSION__/g, APP_VERSION);
 
   res.setHeader('Cache-Control', 'no-cache');
@@ -322,30 +328,30 @@ function renderIndex(req, res) {
   const settings = readSettings();
   const products = readProducts();
   const cover = products.find(p => p.image);
+  const base = baseUrl(req);
+  const image = cover ? absoluteUrl(req, cover.image) : '';
 
   renderHtml(req, res, 'index.html', {
-    title: settings.shopName + ' — цветы с любовью' + (settings.city ? ' | ' + settings.city : ''),
-    description: settings.metaDescription || defaultSettings.metaDescription,
-    url: baseUrl(req) + '/',
+    title: seo.homeTitle(settings, products),
+    description: seo.homeDescription(settings, products),
+    heading: seo.homeHeading(settings),
+    url: base + '/',
     siteName: settings.shopName,
-    image: cover ? absoluteUrl(req, cover.image) : '',
-    jsonLd: {
-      '@context': 'https://schema.org',
-      '@type': 'Florist',
-      name: settings.shopName,
-      description: settings.metaDescription,
-      url: baseUrl(req) + '/',
-      telephone: settings.phone,
-      address: { '@type': 'PostalAddress', addressLocality: settings.city, streetAddress: settings.address || undefined },
-      openingHours: settings.hours
-    }
+    image,
+    google: settings.googleVerification,
+    yandex: settings.yandexVerification,
+    jsonLd: seo.homeJsonLd(settings, products, base, image)
   });
 }
 
-function renderProduct(req, res) {
+/* id приходит либо из красивого адреса, либо из старого ?id=. Передаём его
+   отдельным доводом: в Express 5 req.query — вычисляемое свойство, и запись
+   в него не сохраняется. */
+function renderProduct(req, res, wanted) {
   const settings = readSettings();
   const products = readProducts();
-  const product = products.find(p => String(p.id) === String(req.query.id));
+  const id = wanted !== undefined ? wanted : req.query.id;
+  const product = products.find(p => String(p.id) === String(id));
 
   if (!product) {
     res.status(404);
@@ -360,39 +366,45 @@ function renderProduct(req, res) {
 
   stats.track(req, product.id);
 
-  const price = product.price + ' ' + settings.currency;
-  const description = (product.description || product.composition || '').slice(0, 200) ||
-    ('Букет «' + product.name + '» — ' + price + '. ' + settings.deliveryNote + '.');
+  const base = baseUrl(req);
+  const images = product.images.map(i => absoluteUrl(req, i));
 
   renderHtml(req, res, 'product.html', {
-    title: product.name + ' — ' + price + ' | ' + settings.shopName,
-    description,
-    url: baseUrl(req) + '/product.html?id=' + product.id,
+    title: seo.productTitle(product, settings),
+    description: seo.productDescription(product, settings),
+    /* Каноничный адрес всегда красивый — со старого ?id= стоит редирект,
+       но поисковик должен индексировать только один вариант. */
+    url: base + seo.productPath(product),
     siteName: settings.shopName,
     type: 'product',
-    image: absoluteUrl(req, product.image),
-    jsonLd: {
-      '@context': 'https://schema.org',
-      '@type': 'Product',
-      name: product.name,
-      description,
-      image: product.images.map(i => absoluteUrl(req, i)),
-      category: product.category,
-      offers: {
-        '@type': 'Offer',
-        price: product.price,
-        priceCurrency: 'TJS',
-        availability: product.available
-          ? 'https://schema.org/InStock'
-          : 'https://schema.org/OutOfStock'
-      }
-    }
+    image: images[0] || '',
+    google: settings.googleVerification,
+    yandex: settings.yandexVerification,
+    jsonLd: seo.productJsonLd(product, settings, base, images)
   });
 }
 
 app.get('/', renderIndex);
 app.get('/index.html', renderIndex);
-app.get('/product.html', renderProduct);
+/* Старый адрес остаётся рабочим — по нему уже разошлись ссылки в WhatsApp, —
+   но постоянным редиректом уводит на адрес с названием букета. */
+app.get('/product.html', function (req, res) {
+  const product = readProducts().find(p => String(p.id) === String(req.query.id));
+  if (!product) return renderProduct(req, res);
+  res.redirect(301, seo.productPath(product));
+});
+
+app.get('/bukety/:slug', function (req, res) {
+  const id = String(req.params.slug).split('-')[0];
+  const product = readProducts().find(p => String(p.id) === id);
+  if (!product) return renderProduct(req, res, id);
+
+  /* Название букета изменилось — старая ссылка ведёт на новую, без дублей. */
+  const correct = seo.productPath(product);
+  if (correct !== req.path) return res.redirect(301, correct);
+
+  return renderProduct(req, res, id);
+});
 
 app.get('/robots.txt', function (req, res) {
   res.type('text/plain').send(
@@ -402,18 +414,40 @@ app.get('/robots.txt', function (req, res) {
 
 app.get('/sitemap.xml', function (req, res) {
   const base = baseUrl(req);
-  const urls = ['<url><loc>' + base + '/</loc><priority>1.0</priority></url>'];
+  const products = readProducts();
 
-  readProducts().forEach(p => {
+  /* Дата главной — по самому свежему букету: так поисковик видит, что
+     каталог живой, и заходит чаще. */
+  const freshest = products
+    .map(p => String(p.createdAt).slice(0, 10))
+    .sort()
+    .pop() || new Date().toISOString().slice(0, 10);
+
+  const urls = [
+    '<url><loc>' + base + '/</loc><lastmod>' + freshest + '</lastmod>' +
+    '<changefreq>daily</changefreq><priority>1.0</priority></url>'
+  ];
+
+  products.forEach(p => {
+    /* Картинки перечисляем отдельно — по ним букеты попадают в поиск по фото. */
+    const images = (p.images || [])
+      .map(i => '<image:image><image:loc>' + escapeHtml(absoluteUrl(req, i)) + '</image:loc>' +
+        '<image:title>' + escapeHtml(p.name) + '</image:title></image:image>')
+      .join('');
+
     urls.push(
-      '<url><loc>' + base + '/product.html?id=' + p.id + '</loc>' +
+      '<url><loc>' + base + seo.productPath(p) + '</loc>' +
       '<lastmod>' + String(p.createdAt).slice(0, 10) + '</lastmod>' +
-      '<priority>0.8</priority></url>'
+      '<changefreq>weekly</changefreq>' +
+      '<priority>' + (p.available ? '0.8' : '0.4') + '</priority>' +
+      images + '</url>'
     );
   });
 
   res.type('application/xml').send(
-    '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" ' +
+    'xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n' +
     urls.join('\n') + '\n</urlset>'
   );
 });
@@ -736,6 +770,8 @@ app.put('/api/admin/settings', auth, function (req, res) {
     shopName: cleanText(body.shopName, 60, current.shopName) || current.shopName,
     tagline: cleanText(body.tagline, 80, current.tagline),
     whatsapp: cleanText(body.whatsapp, 20, current.whatsapp).replace(/[^\d]/g, '') || current.whatsapp,
+    googleVerification: cleanText(body.googleVerification, 120, current.googleVerification),
+    yandexVerification: cleanText(body.yandexVerification, 120, current.yandexVerification),
     phone: cleanText(body.phone, 40, current.phone),
     hours: cleanText(body.hours, 60, current.hours),
     city: cleanText(body.city, 60, current.city),

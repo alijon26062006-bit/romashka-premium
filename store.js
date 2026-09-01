@@ -42,7 +42,11 @@ const defaultSettings = {
   deliveryNote: 'Доставка по Душанбе',
   freshNote: 'Свежие цветы каждый день',
   currency: 'сомони',
-  metaDescription: 'Ромашка — цветочный магазин в Душанбе. Свежие букеты, композиции и доставка.'
+  metaDescription: 'Ромашка — цветочный магазин в Душанбе. Свежие букеты, композиции и доставка.',
+  /* Коды из Google Search Console и Яндекс.Вебмастера — ими сайт
+     подтверждает, что он ваш, и попадает в поиск быстрее. */
+  googleVerification: '',
+  yandexVerification: ''
 };
 
 const defaultProducts = [

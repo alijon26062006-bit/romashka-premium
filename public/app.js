@@ -409,8 +409,29 @@ function renderProducts() {
  <div class="product-info" onclick="openProduct(${p.id})"><div><h3>${esc(p.name)}</h3><small>${esc(p.category)}${p.available ? '' : ' · нет в наличии'}</small></div><div class="price">${p.oldPrice > p.price ? `<s>${money(p.oldPrice)}</s> ` : ''}${money(p.price)}</div></div></article>`).join('');
 }
 
+/* Транслитерация для адреса вида /bukety/17-nezhnaya-romashka.
+   Такой адрес понятнее и человеку в выдаче, и поисковику. */
+const TRANSLIT = {
+  'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'e','ж':'zh','з':'z',
+  'и':'i','й':'y','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r',
+  'с':'s','т':'t','у':'u','ф':'f','х':'h','ц':'c','ч':'ch','ш':'sh','щ':'sch',
+  'ъ':'','ы':'y','ь':'','э':'e','ю':'yu','я':'ya'
+};
+
+function productSlug(name) {
+  return String(name || '').toLowerCase().split('')
+    .map(ch => (TRANSLIT[ch] !== undefined ? TRANSLIT[ch] : ch)).join('')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+}
+
+function productLink(product) {
+  const name = productSlug(product.name);
+  return '/bukety/' + product.id + (name ? '-' + name : '');
+}
+
 function openProduct(id) {
-  location.href = '/product.html?id=' + encodeURIComponent(id);
+  const product = allProducts.find(p => p.id === id);
+  location.href = product ? productLink(product) : '/product.html?id=' + encodeURIComponent(id);
 }
 
 function checkout() {
@@ -470,6 +491,20 @@ async function init() {
     renderFilters();
     renderProducts();
     renderCart();
+
+    /* Поисковик знает про адрес ?q=… из разметки SearchAction, а ?category=…
+       стоит в «хлебных крошках» карточки. Оба должны открывать нужное. */
+    const params = new URLSearchParams(location.search);
+    const query = params.get('q');
+    const category = params.get('category');
+
+    if (query) {
+      $('#searchInput').value = query;
+      renderProducts();
+    }
+    if (category && allCategories.some(c => c.name === category)) {
+      selectCategory(category);
+    }
 
     /* Со страницы букета приходят с ?checkout=1 — сразу открываем оформление. */
     if (new URLSearchParams(location.search).get('checkout') === '1' && cart.length) {

@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
 <meta name="robots" content="noindex,nofollow">
 <title>Ромашка — Панель управления</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -379,6 +379,16 @@ input:focus,textarea:focus,select:focus{border-color:#cc8b98;box-shadow:0 0 0 3p
           <div><label>Строка о свежести</label><input id="set-freshNote" maxlength="80" placeholder="Свежие цветы каждый день"></div>
           <div><label>Instagram (ссылка)</label><input id="set-instagram" maxlength="160" placeholder="https://instagram.com/…"></div>
           <div><label>Telegram (ссылка)</label><input id="set-telegram" maxlength="160" placeholder="https://t.me/…"></div>
+          <div>
+            <label>Код Google Search Console</label>
+            <input id="set-googleVerification" maxlength="120" placeholder="только значение content, без тега">
+            <small class="hint" style="padding:0">search.google.com/search-console → «Добавить ресурс» → HTML-тег</small>
+          </div>
+          <div>
+            <label>Код Яндекс.Вебмастера</label>
+            <input id="set-yandexVerification" maxlength="120" placeholder="только значение content, без тега">
+            <small class="hint" style="padding:0">webmaster.yandex.ru → «Добавить сайт» → Мета-тег</small>
+          </div>
           <div class="full">
             <label>Описание сайта для поиска и превью ссылок</label>
             <textarea id="set-metaDescription" maxlength="300" style="min-height:70px"></textarea>
@@ -958,7 +968,8 @@ async function deleteOrder(id) {
    Настройки
    ========================================================================== */
 var SETTING_FIELDS = ['shopName', 'tagline', 'whatsapp', 'phone', 'hours', 'city', 'address',
-  'currency', 'deliveryNote', 'freshNote', 'instagram', 'telegram', 'metaDescription'];
+  'currency', 'deliveryNote', 'freshNote', 'instagram', 'telegram', 'metaDescription',
+  'googleVerification', 'yandexVerification'];
 
 async function loadSettings() {
   settings = await api('/api/admin/settings');

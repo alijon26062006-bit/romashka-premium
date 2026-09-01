@@ -5,7 +5,9 @@
 <main class="product-page"><a class="back" href="/">← Все букеты</a><div id="detail"><div class="loading">Открываем букет...</div></div></main>
 <div class="floating-wa"><a id="floatingWhatsApp" href="#" target="_blank" rel="noopener" aria-label="WhatsApp">◉</a></div>
 <script>
-const id=new URLSearchParams(location.search).get('id');
+/* Адрес теперь /bukety/17-nezhnaya-romashka, но старый ?id=17 тоже должен
+   открываться: по нему уже разошлись ссылки в переписках. */
+const id=(location.pathname.match(/^\/bukety\/(\d+)/)||[])[1]||new URLSearchParams(location.search).get('id');
 let settings={currency:'сомони',whatsapp:'992901403263',shopName:'Ромашка'},gallery=[];
 const money=n=>Number(n||0).toLocaleString('ru-RU')+' '+(settings.currency||'сомони');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
