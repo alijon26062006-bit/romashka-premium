@@ -157,6 +157,13 @@ function isDelivery() {
 function syncDeliveryFields() {
   $('#addressFields').hidden = !isDelivery();
   $('#cityOtherWrap').hidden = !isDelivery() || $('#fCity').value !== OTHER_CITY;
+
+  /* Подсветка выбранной карточки. В CSS это делает :has(input:checked),
+     но класс нужен браузерам постарше, где :has ещё не работает. */
+  document.querySelectorAll('.choice label').forEach(label => {
+    const input = label.querySelector('input');
+    label.classList.toggle('on', Boolean(input && input.checked));
+  });
 }
 
 function showCheckout() {
