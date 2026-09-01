@@ -12,8 +12,18 @@
 
 set -euo pipefail
 
-DOMAIN="${1:-}"
 cd "$(dirname "$0")"
+
+DOMAIN=""
+TAKEOVER=0
+
+for arg in "$@"; do
+  case "$arg" in
+    --takeover) TAKEOVER=1 ;;
+    -*)         printf 'Неизвестный параметр: %s\n' "$arg" >&2; exit 1 ;;
+    *)          if [ -z "$DOMAIN" ]; then DOMAIN="$arg"; fi ;;
+  esac
+done
 
 log()  { printf '\n\033[1;35m▸ %s\033[0m\n' "$1"; }
 warn() { printf '\033[1;33m  %s\033[0m\n' "$1"; }
@@ -125,23 +135,86 @@ fi
 # Домен может быть уже занят другим сайтом — например, certbot умеет
 # дописать server_name в чужой блок. Два блока с одним именем nginx
 # примет молча, но обслуживать домен будет первый, и магазин не появится.
-CONFLICT_FILE="$(
-  $SUDO grep -rlE "server_name[^;]*(^|[[:space:]])${DOMAIN}([[:space:];]|$)" /etc/nginx/ 2>/dev/null \
-    | grep -vx "$CONF_PATH" | grep -vx "$LINK_PATH" | head -n 1 || true
+# Точка в домене — спецсимвол регулярки, экранируем.
+# Для awk слэши удваиваем: он разбирает escape-последовательности в -v сам.
+DOMAIN_RE="$(printf '%s' "$DOMAIN" | sed 's/\./\\./g')"
+DOMAIN_AWK="$(printf '%s' "$DOMAIN_RE" | sed 's/\\/\\\\/g')"
+OUR_REAL="$(readlink -f "$CONF_PATH" 2>/dev/null || echo "$CONF_PATH")"
+
+CONFLICT_FILES="$(
+  $SUDO grep -rlE "server_name[^;]*[[:space:]]${DOMAIN_RE}[[:space:];]" /etc/nginx/ 2>/dev/null \
+    | xargs -r -n1 readlink -f 2>/dev/null | sort -u | grep -vx "$OUR_REAL" || true
 )"
 
-if [ -n "$CONFLICT_FILE" ]; then
-  printf '\n\033[1;31m✖ Домен уже обслуживается другим сайтом\033[0m\n\n'
-  printf '  Файл: %s\n\n' "$CONFLICT_FILE"
-  printf '  Строки с вашим доменом:\n'
-  $SUDO grep -nE "server_name[^;]*${DOMAIN}" "$CONFLICT_FILE" | sed 's/^/    /'
-  printf '\n  Что сделать: уберите %s из server_name в этом файле,\n' "$DOMAIN"
-  printf '  сохраните и запустите скрипт снова:\n\n'
-  printf '    %s nano %s\n' "$SUDO" "$CONFLICT_FILE"
-  printf '    %s nginx -t && %s systemctl reload nginx\n' "$SUDO" "$SUDO"
-  printf '    ./deploy-nginx.sh %s\n\n' "$DOMAIN"
-  printf '  Чужой конфиг я не редактирую — это ваш работающий сайт.\n\n'
-  exit 1
+if [ -n "$CONFLICT_FILES" ]; then
+  printf '\n\033[1;31m✖ Домен уже закреплён за другим сайтом\033[0m\n\n'
+  for f in $CONFLICT_FILES; do
+    printf '  %s\n' "$f"
+    $SUDO grep -nE "server_name[^;]*${DOMAIN_RE}" "$f" | sed 's/^/      /'
+  done
+  printf '\n'
+
+  if [ "$TAKEOVER" -ne 1 ]; then
+    printf '  Пока эта строка на месте, nginx будет отдавать домен тому сайту,\n'
+    printf '  а магазин не покажется.\n\n'
+    printf '  Убрать автоматически (с резервной копией и откатом при ошибке):\n\n'
+    printf '    ./deploy-nginx.sh %s --takeover\n\n' "$DOMAIN"
+    printf '  Либо отредактируйте файл вручную и запустите скрипт снова.\n\n'
+    exit 1
+  fi
+
+  # ---------------- Режим --takeover ----------------
+  # Вырезаем только те server-блоки, которые объявляют наш домен.
+  # Остальное содержимое файла остаётся нетронутым.
+  log "Освобождаю домен от чужих server-блоков"
+  RESTORE_LIST=""
+
+  for f in $CONFLICT_FILES; do
+    BK="${f}.romashka-backup-$(date +%Y%m%d-%H%M%S)"
+    $SUDO cp "$f" "$BK"
+    RESTORE_LIST="${RESTORE_LIST} ${f}:${BK}"
+    warn "Копия сохранена: $BK"
+
+    CLEANED="$(
+      $SUDO awk -v dom="$DOMAIN_AWK" '
+        {
+          line = $0
+          t = line; opened = gsub(/\{/, "", t)
+          t = line; closed = gsub(/\}/, "", t)
+
+          block = block line "\n"
+          depth += opened - closed
+
+          if (depth <= 0) {
+            # Блок собран целиком: выбрасываем его, если он объявляет наш домен
+            if (block ~ ("server_name[^;]*[[:space:]]" dom "[[:space:];]")) {
+              removed++
+            } else {
+              printf "%s", block
+            }
+            block = ""
+            depth = 0
+          }
+        }
+        END { printf "%s", block }
+      ' "$f"
+    )"
+
+    printf '%s' "$CLEANED" | $SUDO tee "$f" >/dev/null
+    warn "Обработан: $f"
+  done
+
+  log "Проверяю nginx после правок"
+  if ! $SUDO nginx -t; then
+    warn "Проверка не прошла — возвращаю всё как было"
+    for pair in $RESTORE_LIST; do
+      orig="${pair%%:*}"; bk="${pair##*:}"
+      $SUDO cp "$bk" "$orig"
+    done
+    $SUDO nginx -t >/dev/null 2>&1 || true
+    die "Изменения откатаны, ваши сайты не пострадали."
+  fi
+  warn "Домен освобождён, конфигурация корректна"
 fi
 
 # Старый конфиг сохраняем, чтобы можно было вернуться
