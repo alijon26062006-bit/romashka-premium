@@ -11,14 +11,21 @@
 
 ## Запуск на сервере одной командой
 
-Нужен любой VPS с Ubuntu и купленный домен, у которого A-запись указывает на IP сервера.
+Нужен любой VPS с Ubuntu и домен, у которого A-запись указывает на IP сервера.
+
+Подключитесь к серверу по SSH и вставьте **одну команду**, заменив домен на свой:
 
 ```bash
-git clone https://github.com/ВАШ-АККАУНТ/romashka.git
-cd romashka
-chmod +x deploy.sh
-./deploy.sh ваш-домен.tj
+apt update && apt install -y git && git clone https://github.com/alijon26062006-bit/romashka-premium.git && cd romashka-premium && ./deploy.sh ваш-домен.tj
 ```
+
+Если вы вошли не под `root`, добавьте `sudo` в начало:
+
+```bash
+sudo apt update && sudo apt install -y git && git clone https://github.com/alijon26062006-bit/romashka-premium.git && cd romashka-premium && ./deploy.sh ваш-домен.tj
+```
+
+`chmod +x` не нужен — права на запуск уже записаны в репозитории.
 
 Скрипт сам:
 1. установит Docker, если его нет;

@@ -17,14 +17,27 @@ cd "$(dirname "$0")"
 log()  { printf '\n\033[1;35m▸ %s\033[0m\n' "$1"; }
 warn() { printf '\033[1;33m  %s\033[0m\n' "$1"; }
 
+# ------------------------------------------------------------------ Права
+# Под root работаем напрямую, под обычным пользователем — через sudo.
+SUDO=""
+if [ "$(id -u)" -ne 0 ]; then
+  if command -v sudo >/dev/null 2>&1; then
+    SUDO="sudo"
+    warn "Запущено не от root — используется sudo, может спросить пароль"
+  else
+    echo "Запустите скрипт от root или установите sudo." >&2
+    exit 1
+  fi
+fi
+
 # ------------------------------------------------------------------ Docker
 log "Проверяю Docker"
 if ! command -v docker >/dev/null 2>&1; then
   warn "Docker не найден — устанавливаю (займёт 1-2 минуты)"
-  curl -fsSL https://get.docker.com | sh
+  curl -fsSL https://get.docker.com | $SUDO sh
 fi
 
-if ! docker compose version >/dev/null 2>&1; then
+if ! $SUDO docker compose version >/dev/null 2>&1; then
   echo "Нужен Docker Compose v2. Обновите Docker и запустите скрипт снова." >&2
   exit 1
 fi
@@ -65,15 +78,22 @@ fi
 
 # ------------------------------------------------------------------ Запуск
 log "Собираю и запускаю проект"
-docker compose $PROFILE_ARGS up -d --build
+$SUDO docker compose $PROFILE_ARGS up -d --build
 
 log "Проверяю, что сервер отвечает"
+SERVER_UP=0
 for i in $(seq 1 30); do
-  if docker compose exec -T web wget -qO- http://127.0.0.1:3000/api/health >/dev/null 2>&1; then
+  if $SUDO docker compose exec -T web wget -qO- http://127.0.0.1:3000/api/health >/dev/null 2>&1; then
+    SERVER_UP=1
     break
   fi
   sleep 2
 done
+
+if [ "$SERVER_UP" -ne 1 ]; then
+  warn "Сервер не ответил за минуту. Посмотрите, что случилось:"
+  warn "  $SUDO docker compose logs --tail 50"
+fi
 
 # ------------------------------------------------------------------ Итог
 ADMIN_USER_VALUE="$(grep -E '^ADMIN_USER=' .env | cut -d= -f2-)"
@@ -88,9 +108,9 @@ printf '  Админка: %s/admin.html\n' "$SITE/admin.html"
 printf '  Логин:   %s\n' "$ADMIN_USER_VALUE"
 printf '  Пароль:  %s\n' "$ADMIN_PASS_VALUE"
 printf '\033[1;32m==========================================\033[0m\n\n'
-printf '  Логи:       docker compose logs -f\n'
+printf '  Логи:       %s docker compose logs -f\n' "$SUDO"
 printf '  Обновить:   git pull && ./deploy.sh %s\n' "$DOMAIN_ARG"
-printf '  Остановить: docker compose down\n\n'
+printf '  Остановить: %s docker compose down\n\n' "$SUDO"
 
 if [ -n "$NEW_PASSWORD" ]; then
   warn "Сохраните пароль! Он также лежит в файле .env"
