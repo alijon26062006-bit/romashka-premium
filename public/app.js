@@ -79,11 +79,15 @@ function renderCart() {
   $('#cartItems').innerHTML = items.length ? items.map(i => `<div class="cart-item"><img src="${esc(thumb(i.product.image, 200))}" alt="${esc(i.product.name)}" onerror="imgFallback(this)"><div><h4>${esc(i.product.name)}</h4><small>${money(i.product.price)}</small><div class="qty"><button onclick="changeQty(${i.id},-1)">−</button><span>${i.qty}</span><button onclick="changeQty(${i.id},1)">+</button></div></div><button class="remove" onclick="changeQty(${i.id},-${i.qty})" aria-label="Удалить">×</button></div>`).join('')
     : '<div class="cart-empty"><div style="font-size:30px;margin-bottom:12px">♡</div>Ваша корзина пока пуста.<br>Добавьте понравившийся букет.</div>';
 
-  const lines = items.map(i => `• ${i.product.name} × ${i.qty} — ${money(i.product.price * i.qty)}`).join('\n');
-  $('#cartWhatsApp').href = waUrl('Здравствуйте! 🌸 Хочу оформить заказ:\n' + lines + '\nИтого: ' + money(total) + '\nПодскажите, пожалуйста, как оформить доставку?');
+  /* Ссылка ведёт на оформление, а адрес нужен как запасной вариант,
+     если скрипт почему-то не отработает. */
+  $('#cartWhatsApp').href = waUrl();
 }
 
 function openCart() {
+  /* Корзина всегда открывается списком: если в прошлый раз ушли на форму
+     и закрыли шторку, возвращаться туда с устаревшими данными незачем. */
+  showCart();
   $('#cartDrawer').classList.add('open');
   $('#cartOverlay').classList.add('open');
   document.body.classList.add('no-scroll');
@@ -103,18 +107,206 @@ function toast(text) {
   window.toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
 }
 
-/* Заявка уходит на сервер до перехода в WhatsApp — владелец видит все обращения. */
-function logOrder() {
-  const items = cart.map(i => ({ id: i.id, qty: i.qty }));
-  if (!items.length) return;
+/* --------------------------------------------------------------------------
+   Оформление заказа: контакты и адрес доставки
+   -------------------------------------------------------------------------- */
+
+/* Города Таджикистана. Свой город магазина всегда идёт первым, а если клиент
+   из другого места — в конце есть «Другой город» с полем для ввода. */
+const CITIES = [
+  'Душанбе', 'Худжанд', 'Бохтар', 'Куляб', 'Истаравшан', 'Турсунзаде',
+  'Исфара', 'Пенджикент', 'Вахдат', 'Гиссар', 'Канибадам', 'Дангара',
+  'Рогун', 'Хорог', 'Нурек', 'Яван'
+];
+
+const OTHER_CITY = 'Другой город';
+
+/* Что клиент вводил в прошлый раз — чтобы не набирать адрес заново. */
+function savedCustomer() {
+  try {
+    return JSON.parse(localStorage.getItem('romashka_customer') || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function rememberCustomer(data) {
+  try {
+    localStorage.setItem('romashka_customer', JSON.stringify(data));
+  } catch { /* приватный режим браузера — просто не запомним */ }
+}
+
+function fillCities(selected) {
+  const list = [];
+  const add = name => { if (name && !list.includes(name)) list.push(name); };
+
+  add(settings.city);
+  CITIES.forEach(add);
+
+  const value = selected && list.includes(selected) ? selected : list[0];
+
+  $('#fCity').innerHTML = list.concat(OTHER_CITY)
+    .map(c => `<option${c === value ? ' selected' : ''}>${esc(c)}</option>`).join('');
+}
+
+function isDelivery() {
+  const picked = document.querySelector('input[name="delivery"]:checked');
+  return !picked || picked.value === 'Доставка';
+}
+
+function syncDeliveryFields() {
+  $('#addressFields').hidden = !isDelivery();
+  $('#cityOtherWrap').hidden = !isDelivery() || $('#fCity').value !== OTHER_CITY;
+}
+
+function showCheckout() {
+  const items = cartDetails();
+  const total = items.reduce((s, i) => s + i.qty * Number(i.product.price), 0);
+  const saved = savedCustomer();
+
+  $('#checkoutTotal').textContent = money(total);
+  $('#fName').value = saved.customer || '';
+  $('#fPhone').value = saved.phone || '';
+  $('#fStreet').value = saved.street || '';
+  $('#fHouse').value = saved.house || '';
+  $('#fFlat').value = saved.apartment || '';
+  $('#fLandmark').value = saved.landmark || '';
+  $('#fWhen').value = '';
+  $('#fComment').value = '';
+
+  fillCities(saved.city);
+  if (saved.city && $('#fCity').value === OTHER_CITY) $('#fCityOther').value = saved.city;
+
+  hideError();
+  syncDeliveryFields();
+
+  $('#cartView').hidden = true;
+  $('#checkoutView').hidden = false;
+  $('#checkoutView').scrollTop = 0;
+}
+
+function showCart() {
+  $('#checkoutView').hidden = true;
+  $('#cartView').hidden = false;
+}
+
+function hideError() {
+  $('#checkoutError').hidden = true;
+  document.querySelectorAll('.field .bad').forEach(el => el.classList.remove('bad'));
+}
+
+function showError(message, field) {
+  const box = $('#checkoutError');
+  box.textContent = message;
+  box.hidden = false;
+
+  if (field) {
+    field.classList.add('bad');
+    field.focus();
+    field.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+}
+
+/* Телефон принимаем в любом виде, но цифр должно хватать на настоящий номер. */
+function phoneDigits(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function collectOrder() {
+  const delivery = isDelivery() ? 'Доставка' : 'Самовывоз';
+  const chosenCity = $('#fCity').value;
+
+  return {
+    customer: $('#fName').value.trim(),
+    phone: $('#fPhone').value.trim(),
+    delivery,
+    city: delivery === 'Доставка' ? (chosenCity === OTHER_CITY ? $('#fCityOther').value.trim() : chosenCity) : '',
+    street: delivery === 'Доставка' ? $('#fStreet').value.trim() : '',
+    house: delivery === 'Доставка' ? $('#fHouse').value.trim() : '',
+    apartment: delivery === 'Доставка' ? $('#fFlat').value.trim() : '',
+    landmark: delivery === 'Доставка' ? $('#fLandmark').value.trim() : '',
+    when: $('#fWhen').value.trim(),
+    comment: $('#fComment').value.trim()
+  };
+}
+
+function validateOrder(order) {
+  if (!order.customer) return { message: 'Напишите, пожалуйста, ваше имя.', field: $('#fName') };
+  if (phoneDigits(order.phone).length < 9) return { message: 'Проверьте номер телефона — по нему магазин с вами свяжется.', field: $('#fPhone') };
+
+  if (order.delivery === 'Доставка') {
+    if (!order.city) return { message: 'Укажите город доставки.', field: $('#fCityOther') };
+    if (!order.street) return { message: 'Укажите улицу или район — без адреса курьер не приедет.', field: $('#fStreet') };
+    if (!order.house) return { message: 'Укажите номер дома.', field: $('#fHouse') };
+  }
+
+  return null;
+}
+
+/* Готовое сообщение для WhatsApp: клиенту останется только нажать «отправить». */
+function orderText(order, items, total) {
+  const lines = items.map(i => `• ${i.product.name} × ${i.qty} — ${money(i.product.price * i.qty)}`);
+
+  const parts = [
+    `Здравствуйте! 🌸 Хочу оформить заказ в магазине «${settings.shopName || 'Ромашка'}».`,
+    '',
+    '🛍 Букеты:',
+    lines.join('\n'),
+    `Итого: ${money(total)}`,
+    '',
+    `👤 Имя: ${order.customer}`,
+    `📞 Телефон: ${order.phone}`
+  ];
+
+  if (order.delivery === 'Доставка') {
+    const address = order.street + ', дом ' + order.house + (order.apartment ? ', кв. ' + order.apartment : '');
+    parts.push('', '🚚 Доставка', `🏙 Город: ${order.city}`, `📍 Адрес: ${address}`);
+    if (order.landmark) parts.push(`🧭 Ориентир: ${order.landmark}`);
+  } else {
+    parts.push('', '🏬 Заберу сам из магазина');
+  }
+
+  if (order.when) parts.push(`🕒 Когда: ${order.when}`);
+  if (order.comment) parts.push('', `💬 ${order.comment}`);
+
+  return parts.join('\n');
+}
+
+function submitOrder(event) {
+  event.preventDefault();
+
+  const items = cartDetails();
+  if (!items.length) {
+    showCart();
+    toast('Корзина пуста');
+    return;
+  }
+
+  const order = collectOrder();
+  hideError();
+
+  const problem = validateOrder(order);
+  if (problem) {
+    showError(problem.message, problem.field);
+    return;
+  }
+
+  const total = items.reduce((s, i) => s + i.qty * Number(i.product.price), 0);
+  rememberCustomer(order);
+
+  /* Заявка уходит на сервер до перехода в WhatsApp — владелец видит её,
+     даже если клиент передумает отправлять сообщение. keepalive нужен
+     потому, что страница тут же уходит на wa.me. */
   try {
     fetch('/api/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items }),
+      body: JSON.stringify(Object.assign({ items: cart.map(i => ({ id: i.id, qty: i.qty })) }, order)),
       keepalive: true
     }).catch(() => {});
   } catch (e) { /* заказ всё равно уйдёт в WhatsApp */ }
+
+  location.href = waUrl(orderText(order, items, total));
 }
 
 /* --------------------------------------------------------------------------
@@ -195,13 +387,7 @@ function checkout() {
     toast('Сначала добавьте букет в корзину');
     return;
   }
-
-  const items = cartDetails();
-  const total = items.reduce((s, i) => s + i.qty * i.product.price, 0);
-  const lines = items.map(i => `${i.product.name} × ${i.qty}`).join(', ');
-
-  logOrder();
-  location.href = waUrl(`Здравствуйте! 🌸 Хочу оформить заказ в магазине «${settings.shopName}».\n\n${lines}\nИтого: ${money(total)}\n\nПодскажите, пожалуйста, как оформить доставку?`);
+  showCheckout();
 }
 
 /* --------------------------------------------------------------------------
@@ -253,6 +439,13 @@ async function init() {
     renderFilters();
     renderProducts();
     renderCart();
+
+    /* Со страницы букета приходят с ?checkout=1 — сразу открываем оформление. */
+    if (new URLSearchParams(location.search).get('checkout') === '1' && cart.length) {
+      openCart();
+      showCheckout();
+      history.replaceState(null, '', location.pathname);
+    }
   } catch (e) {
     $('#productGrid').innerHTML = '<div class="loading">Не удалось загрузить каталог. Проверьте, что сервер запущен.</div>';
   }
@@ -262,7 +455,18 @@ $('#cartBtn').addEventListener('click', openCart);
 $('#closeCart').addEventListener('click', closeCart);
 $('#cartOverlay').addEventListener('click', closeCart);
 $('#checkoutBtn').addEventListener('click', checkout);
-$('#cartWhatsApp').addEventListener('click', logOrder);
+$('#backToCart').addEventListener('click', showCart);
+$('#checkoutView').addEventListener('submit', submitOrder);
+$('#fCity').addEventListener('change', syncDeliveryFields);
+document.querySelectorAll('input[name="delivery"]').forEach(radio => {
+  radio.addEventListener('change', syncDeliveryFields);
+});
+/* Вторая кнопка вела прямо в WhatsApp мимо формы — заказ уходил без адреса.
+   Теперь она открывает то же оформление: в WhatsApp попадём следующим шагом. */
+$('#cartWhatsApp').addEventListener('click', event => {
+  event.preventDefault();
+  checkout();
+});
 
 $('#searchBtn').addEventListener('click', () => {
   $('#searchDrawer').classList.add('open');

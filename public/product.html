@@ -31,13 +31,26 @@ async function init(){
   gallery=(p.images&&p.images.length?p.images:[p.image]).filter(Boolean);
   if(!gallery.length)gallery=[PLACEHOLDER];
 
-  const wa='https://wa.me/'+settings.whatsapp+'?text='+encodeURIComponent(`Здравствуйте! 🌸\nХочу заказать букет «${p.name}».\nЦена: ${money(p.price)}.\nПодскажите, пожалуйста, как оформить заказ?`);
+
   const thumbs=gallery.length>1?`<div class="detail-gallery">${gallery.map((src,i)=>`<img src="${esc(src)}" alt="${esc(p.name)} — фото ${i+1}" class="${i===0?'on':''}" loading="lazy" onerror="imgFallback(this)" onclick="selectPhoto(${i})">`).join('')}</div>`:'';
 
-  document.querySelector('#detail').innerHTML=`<div class="detail"><div><div class="detail-photo"><img id="mainPhoto" src="${esc(gallery[0])}" alt="${esc(p.name)}" onerror="imgFallback(this)"></div>${thumbs}</div><div class="detail-copy"><span class="eyebrow">${esc(p.category)}</span><h1>${esc(p.name)}</h1><div class="detail-price">${p.oldPrice>p.price?`<s>${money(p.oldPrice)}</s>`:''}${money(p.price)}</div><p class="detail-description">${esc(p.description)}</p><div class="detail-meta">${metaCell('Состав',p.composition||'Уточняйте при заказе')}${metaCell('Размер',p.size||'Индивидуально')}${metaCell('Повод',(p.occasions||[]).join(', '))}${metaCell('Цвет',(p.colors||[]).join(', '))}</div><div class="detail-order"><a class="btn btn-primary" href="${wa}" target="_blank" rel="noopener">Заказать в WhatsApp ↗</a><a class="btn btn-outline" href="/">Вернуться к выбору</a></div><div class="availability ${p.available?'ok':'off'}">${p.available?'● Букет доступен для заказа':'○ Сейчас нет в наличии'}</div></div></div>`;
+  document.querySelector('#detail').innerHTML=`<div class="detail"><div><div class="detail-photo"><img id="mainPhoto" src="${esc(gallery[0])}" alt="${esc(p.name)}" onerror="imgFallback(this)"></div>${thumbs}</div><div class="detail-copy"><span class="eyebrow">${esc(p.category)}</span><h1>${esc(p.name)}</h1><div class="detail-price">${p.oldPrice>p.price?`<s>${money(p.oldPrice)}</s>`:''}${money(p.price)}</div><p class="detail-description">${esc(p.description)}</p><div class="detail-meta">${metaCell('Состав',p.composition||'Уточняйте при заказе')}${metaCell('Размер',p.size||'Индивидуально')}${metaCell('Повод',(p.occasions||[]).join(', '))}${metaCell('Цвет',(p.colors||[]).join(', '))}</div><div class="detail-order">${p.available?'<button class="btn btn-primary" onclick="orderNow()">Заказать букет →</button>':''}<a class="btn btn-outline" href="/">Вернуться к выбору</a></div><div class="availability ${p.available?'ok':'off'}">${p.available?'● Букет доступен для заказа':'○ Сейчас нет в наличии'}</div></div></div>`;
  }catch(e){
   document.querySelector('#detail').innerHTML='<div class="loading">Не удалось загрузить товар. Проверьте, что сервер запущен.</div>';
  }
 }
 init();
+
+/* Раньше кнопка вела прямо в WhatsApp, и заказ уходил без адреса и мимо заявок.
+   Теперь букет кладётся в общую корзину (она одна на весь сайт, в localStorage),
+   а оформление с адресом открывается на главной. */
+function orderNow(){
+  try{
+    const cart=JSON.parse(localStorage.getItem('romashka_cart')||'[]');
+    const item=cart.find(x=>String(x.id)===String(id));
+    if(item)item.qty++;else cart.push({id:Number(id),qty:1});
+    localStorage.setItem('romashka_cart',JSON.stringify(cart));
+  }catch(e){/* приватный режим — оформим без запоминания */}
+  location.href='/?checkout=1';
+}
 </script></body></html>

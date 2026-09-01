@@ -254,6 +254,19 @@ function ordersText() {
     order.items.forEach(item => {
       lines.push('   • ' + escapeHtml(item.name) + ' × ' + item.qty);
     });
+
+    /* Адрес — главное в заявке: по нему поедет курьер. */
+    if (order.delivery === 'Самовывоз') {
+      lines.push('   🏬 Самовывоз');
+    } else if (order.street || order.city) {
+      let address = [order.city, order.street].filter(Boolean).join(', ');
+      if (order.house) address += ', дом ' + order.house;
+      if (order.apartment) address += ', кв. ' + order.apartment;
+      lines.push('   🚚 ' + escapeHtml(address));
+      if (order.landmark) lines.push('   🧭 ' + escapeHtml(order.landmark));
+    }
+
+    if (order.when) lines.push('   🕒 ' + escapeHtml(order.when));
     if (order.comment) lines.push('   💬 ' + escapeHtml(order.comment));
     lines.push('');
   });

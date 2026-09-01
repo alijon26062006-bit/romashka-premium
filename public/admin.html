@@ -115,6 +115,9 @@ input:focus,textarea:focus,select:focus{border-color:#cc8b98;box-shadow:0 0 0 3p
 
 /* --- заявки --- */
 .orders{display:grid;gap:11px}
+.order-who{font-size:12px;margin:2px 0 8px}
+.order-who a{color:#7a6a63}
+.order-address{font-size:12px;line-height:1.6;background:#faf6f3;border-radius:6px;padding:9px 11px;margin:8px 0}
 .order{background:#fff;border:1px solid var(--line);border-radius:5px;padding:16px 18px}
 .order-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .order-head b{font-size:12px}
@@ -890,13 +893,31 @@ async function loadOrders(notify) {
       return '<li>' + esc(i.name) + ' × ' + i.qty + ' — ' + money(i.price * i.qty) + '</li>';
     }).join('');
 
+    var who = [];
+    if (o.customer) who.push('<b>' + esc(o.customer) + '</b>');
+    if (o.phone) who.push('<a href="tel:' + esc(o.phone.replace(/[^\d+]/g, '')) + '">' + esc(o.phone) + '</a>');
+
+    /* Адрес доставки — то, ради чего заявка и нужна: по нему едет курьер. */
+    var address = '';
+    if (o.delivery === 'Самовывоз') {
+      address = '🏬 Самовывоз';
+    } else if (o.street || o.city) {
+      var line = [o.city, o.street].filter(Boolean).join(', ');
+      if (o.house) line += ', дом ' + o.house;
+      if (o.apartment) line += ', кв. ' + o.apartment;
+      address = '🚚 ' + esc(line) + (o.landmark ? '<br><span class="hint" style="padding:0">Ориентир: ' + esc(o.landmark) + '</span>' : '');
+    }
+
     return '<article class="order">' +
       '<div class="order-head">' +
         '<b>Заявка #' + o.id + '</b>' +
         '<span class="badge ' + esc(o.status) + '">' + (o.status === 'new' ? 'Новая' : o.status === 'done' ? 'Обработана' : 'Отменена') + '</span>' +
         '<small>' + esc(date) + '</small>' +
       '</div>' +
+      (who.length ? '<div class="order-who">' + who.join(' · ') + '</div>' : '') +
       '<ul>' + items + '</ul>' +
+      (address ? '<div class="order-address">' + address + '</div>' : '') +
+      (o.when ? '<div class="hint">Когда привезти: ' + esc(o.when) + '</div>' : '') +
       (o.comment ? '<div class="hint">Комментарий: ' + esc(o.comment) + '</div>' : '') +
       '<div class="order-foot">' +
         '<span class="total">' + money(o.total) + '</span>' +

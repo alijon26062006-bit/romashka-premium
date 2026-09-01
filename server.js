@@ -519,11 +519,22 @@ app.post('/api/orders', function (req, res) {
 
   if (!lines.length) return res.status(400).json({ error: 'Товары не найдены' });
 
+  /* Самовывоз — единственный способ без адреса. Всё остальное считаем доставкой,
+     чтобы подделанное значение из формы не превратило заказ в самовывоз. */
+  const delivery = cleanText(req.body.delivery, 20) === 'Самовывоз' ? 'Самовывоз' : 'Доставка';
+
   const order = {
     id: Date.now(),
     createdAt: new Date().toISOString(),
     customer: cleanText(req.body.customer, 80),
     phone: cleanText(req.body.phone, 40),
+    delivery,
+    city: delivery === 'Доставка' ? cleanText(req.body.city, 60) : '',
+    street: delivery === 'Доставка' ? cleanText(req.body.street, 120) : '',
+    house: delivery === 'Доставка' ? cleanText(req.body.house, 20) : '',
+    apartment: delivery === 'Доставка' ? cleanText(req.body.apartment, 20) : '',
+    landmark: delivery === 'Доставка' ? cleanText(req.body.landmark, 120) : '',
+    when: cleanText(req.body.when, 80),
     comment: cleanMultiline(req.body.comment, 500),
     items: lines,
     total,
