@@ -91,7 +91,8 @@ if grep -qE '^DUCKDNS_TOKEN=.+' .env; then
 fi
 
 log "Собираю и запускаю магазин"
-$SUDO docker compose -f docker-compose.nginx.yml $PROFILE_ARGS up -d --build
+# --remove-orphans убирает контейнер caddy, если раньше запускали обычный deploy.sh
+$SUDO docker compose -f docker-compose.nginx.yml $PROFILE_ARGS up -d --build --remove-orphans
 
 log "Жду ответа приложения"
 SERVER_UP=0
@@ -121,6 +122,28 @@ else
   LINK_PATH=""
 fi
 
+# Домен может быть уже занят другим сайтом — например, certbot умеет
+# дописать server_name в чужой блок. Два блока с одним именем nginx
+# примет молча, но обслуживать домен будет первый, и магазин не появится.
+CONFLICT_FILE="$(
+  $SUDO grep -rlE "server_name[^;]*(^|[[:space:]])${DOMAIN}([[:space:];]|$)" /etc/nginx/ 2>/dev/null \
+    | grep -vx "$CONF_PATH" | grep -vx "$LINK_PATH" | head -n 1 || true
+)"
+
+if [ -n "$CONFLICT_FILE" ]; then
+  printf '\n\033[1;31m✖ Домен уже обслуживается другим сайтом\033[0m\n\n'
+  printf '  Файл: %s\n\n' "$CONFLICT_FILE"
+  printf '  Строки с вашим доменом:\n'
+  $SUDO grep -nE "server_name[^;]*${DOMAIN}" "$CONFLICT_FILE" | sed 's/^/    /'
+  printf '\n  Что сделать: уберите %s из server_name в этом файле,\n' "$DOMAIN"
+  printf '  сохраните и запустите скрипт снова:\n\n'
+  printf '    %s nano %s\n' "$SUDO" "$CONFLICT_FILE"
+  printf '    %s nginx -t && %s systemctl reload nginx\n' "$SUDO" "$SUDO"
+  printf '    ./deploy-nginx.sh %s\n\n' "$DOMAIN"
+  printf '  Чужой конфиг я не редактирую — это ваш работающий сайт.\n\n'
+  exit 1
+fi
+
 # Старый конфиг сохраняем, чтобы можно было вернуться
 if [ -f "$CONF_PATH" ]; then
   BACKUP="${CONF_PATH}.backup-$(date +%Y%m%d-%H%M%S)"
@@ -128,16 +151,17 @@ if [ -f "$CONF_PATH" ]; then
   warn "Прежний конфиг сохранён: $BACKUP"
 fi
 
-# Кавычки у NGINXCONF обязательны: иначе bash съест $host и $remote_addr
-cat <<'NGINXCONF' | sed -e "s|__DOMAIN__|${DOMAIN}|g" -e "s|__PORT__|${APP_PORT}|g" | $SUDO tee "$CONF_PATH" >/dev/null
-# Ромашка Premium — проксирование на приложение в Docker.
-# Файл создан скриптом deploy-nginx.sh, правки при повторном запуске перезапишутся.
+# Если сертификат для домена уже получен, сразу пишем конфиг с HTTPS —
+# так certbot не станет второй раз править чужие файлы.
+CERT_DIR="/etc/letsencrypt/live/${DOMAIN}"
+HAS_CERT=0
+if $SUDO test -f "${CERT_DIR}/fullchain.pem"; then
+  HAS_CERT=1
+  warn "Найден готовый сертификат: ${CERT_DIR}"
+fi
 
-server {
-    listen 80;
-    listen [::]:80;
-    server_name __DOMAIN__;
-
+# Кавычки у NGINXPROXY обязательны: иначе bash съест $host и $remote_addr
+PROXY_BLOCK="$(cat <<'NGINXPROXY'
     # Фотографии букетов до 8 МБ. Без этой строки nginx вернёт 413
     # и загрузка фото в админке молча перестанет работать.
     client_max_body_size 10M;
@@ -157,8 +181,53 @@ server {
         proxy_read_timeout 120s;
         proxy_send_timeout 120s;
     }
+NGINXPROXY
+)"
+
+HEADER="# Ромашка Premium — проксирование на приложение в Docker.
+# Файл создан скриптом deploy-nginx.sh, правки при повторном запуске перезапишутся."
+
+if [ "$HAS_CERT" -eq 1 ]; then
+  SSL_OPTIONS=""
+  if $SUDO test -f /etc/letsencrypt/options-ssl-nginx.conf; then
+    SSL_OPTIONS="    include /etc/letsencrypt/options-ssl-nginx.conf;"
+  fi
+
+  CONFIG_TEXT="${HEADER}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __DOMAIN__;
+    return 301 https://\$host\$request_uri;
 }
-NGINXCONF
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name __DOMAIN__;
+
+    ssl_certificate     ${CERT_DIR}/fullchain.pem;
+    ssl_certificate_key ${CERT_DIR}/privkey.pem;
+${SSL_OPTIONS}
+
+${PROXY_BLOCK}
+}"
+else
+  CONFIG_TEXT="${HEADER}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __DOMAIN__;
+
+${PROXY_BLOCK}
+}"
+fi
+
+printf '%s\n' "$CONFIG_TEXT" \
+  | sed -e "s|__DOMAIN__|${DOMAIN}|g" -e "s|__PORT__|${APP_PORT}|g" \
+  | $SUDO tee "$CONF_PATH" >/dev/null
 
 if [ -n "$LINK_PATH" ] && [ ! -e "$LINK_PATH" ]; then
   $SUDO ln -s "$CONF_PATH" "$LINK_PATH"
@@ -174,9 +243,12 @@ $SUDO systemctl reload nginx 2>/dev/null || $SUDO nginx -s reload
 warn "nginx перезагружен, другие сайты не тронуты"
 
 # ------------------------------------------------------------------ SSL
-log "Получаю SSL-сертификат"
+log "Проверяю SSL"
 
-if command -v certbot >/dev/null 2>&1; then
+if [ "$HAS_CERT" -eq 1 ]; then
+  warn "Сертификат уже был получен и подключён — certbot не запускаю"
+  SCHEME="https"
+elif command -v certbot >/dev/null 2>&1; then
   ACME_EMAIL_VALUE="$(grep -E '^ACME_EMAIL=' .env | cut -d= -f2- || true)"
   if [ -n "$ACME_EMAIL_VALUE" ]; then
     EMAIL_ARGS="-m ${ACME_EMAIL_VALUE}"
