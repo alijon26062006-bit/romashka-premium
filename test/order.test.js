@@ -145,6 +145,23 @@ function orders() {
   assert.equal(orders()[0].total, first.price, 'цена из запроса игнорируется');
   console.log('  ✓ цену из запроса сервер не берёт');
 
+  console.log('\nНомер WhatsApp в ответе');
+  res = await post({ items: [{ id: first.id, qty: 1 }], customer: 'Тест', phone: '900000004', delivery: 'Самовывоз' });
+  let body = await res.json();
+  assert.ok(body.whatsapp, 'сервер должен вернуть номер, на который слать заказ');
+  console.log('  ✓ ответ содержит номер: ' + body.whatsapp);
+
+  /* Владелец меняет номер из телеграма — правка ложится прямо в settings.json. */
+  const settingsFile = path.join(DATA_DIR, 'settings.json');
+  const settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+  settings.whatsapp = '992446007080';
+  fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2));
+
+  res = await post({ items: [{ id: first.id, qty: 1 }], customer: 'Тест', phone: '900000005', delivery: 'Самовывоз' });
+  body = await res.json();
+  assert.equal(body.whatsapp, '992446007080', 'после смены заказы должны идти на новый номер');
+  console.log('  ✓ после смены номера ответ отдаёт новый: ' + body.whatsapp);
+
   console.log('\nПустая корзина');
   res = await post({ items: [], customer: 'Тест', phone: '900000003' });
   assert.equal(res.status, 400, 'пустой заказ должен отклоняться');

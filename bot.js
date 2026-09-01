@@ -42,7 +42,8 @@ let running = false;
 let offset = 0;
 let activeAbort = null;
 
-/* Незаконченные карточки товара: chatId → { step, data, at } */
+/* Незаконченные мастера: chatId → { kind, step, data, at }.
+   kind различает, что человек сейчас заполняет: карточку товара или номер. */
 const drafts = new Map();
 
 /* --------------------------------------------------------------------------
@@ -121,7 +122,8 @@ function edit(chatId, messageId, text, keyboard) {
 const MENU = {
   keyboard: [
     [{ text: '➕ Добавить товар' }, { text: '📦 Товары' }],
-    [{ text: '📊 Статистика' }, { text: '🧾 Заявки' }]
+    [{ text: '📊 Статистика' }, { text: '🧾 Заявки' }],
+    [{ text: '⚙️ Настройки' }]
   ],
   resize_keyboard: true
 };
@@ -381,6 +383,8 @@ async function feedDraft(chatId, message) {
   const step = draft.step;
   draft.at = Date.now();
 
+  if (draft.kind === 'whatsapp') return feedWhatsapp(chatId, draft, text);
+
   if (step === 'name') {
     const name = store.cleanText(text, 120);
     if (!name) {
@@ -486,6 +490,87 @@ function saveDraft(chatId) {
 }
 
 /* --------------------------------------------------------------------------
+   Номер WhatsApp, на который уходят заказы
+   -------------------------------------------------------------------------- */
+
+/* wa.me принимает только цифры с кодом страны. Всё остальное — плюсы, скобки,
+   пробелы, дефисы — выбрасываем. Местный девятизначный номер дополняем кодом
+   Таджикистана: его почти всегда диктуют без 992. */
+function normalizeWhatsapp(raw) {
+  let digits = String(raw || '').replace(/\D/g, '');
+  if (digits.length === 9) digits = '992' + digits;
+  return digits;
+}
+
+/* Таджикский номер показываем привычными группами, остальные — как есть. */
+function prettyPhone(digits) {
+  const match = /^992(\d{2})(\d{3})(\d{2})(\d{2})$/.exec(digits);
+  if (match) return '+992 ' + match[1] + ' ' + match[2] + ' ' + match[3] + ' ' + match[4];
+  return '+' + digits;
+}
+
+function settingsText() {
+  const settings = store.readSettings();
+
+  return [
+    '⚙️ <b>Настройки магазина</b>',
+    '',
+    'Магазин: ' + escapeHtml(settings.shopName || '—'),
+    'Заказы уходят на WhatsApp: <b>' + escapeHtml(prettyPhone(String(settings.whatsapp || ''))) + '</b>',
+    'Телефон на сайте: ' + escapeHtml(settings.phone || '—'),
+    'Город: ' + escapeHtml(settings.city || '—'),
+    'Валюта: ' + escapeHtml(settings.currency || '—'),
+    '',
+    '<i>Остальное меняется в веб-панели, в разделе «Настройки».</i>'
+  ].join('\n');
+}
+
+const SETTINGS_KEYBOARD = {
+  inline_keyboard: [[{ text: '📱 Изменить номер WhatsApp', callback_data: 'wa' }]]
+};
+
+async function feedWhatsapp(chatId, draft, text) {
+  if (draft.step === 'number') {
+    const digits = normalizeWhatsapp(text);
+
+    if (digits.length < 10 || digits.length > 15) {
+      await send(
+        chatId,
+        'Не похоже на номер. Пришлите его с кодом страны, например <code>+992 90 140 32 63</code>,\n' +
+        'или просто девять цифр — код Таджикистана добавлю сам.',
+        CANCEL
+      );
+      return true;
+    }
+
+    draft.data.whatsapp = digits;
+    draft.step = 'confirm';
+
+    await send(
+      chatId,
+      'Новый номер для заказов:\n\n<b>' + escapeHtml(prettyPhone(digits)) + '</b>\n' +
+      'Ссылка: wa.me/' + escapeHtml(digits) + '\n\n' +
+      'Проверьте, что он верный — после сохранения все заказы с сайта пойдут сюда.',
+      { remove_keyboard: true }
+    );
+    await send(chatId, 'Сохранить этот номер?', {
+      inline_keyboard: [[
+        { text: '💾 Сохранить', callback_data: 'wasave' },
+        { text: '✖️ Отменить', callback_data: 'drop' }
+      ]]
+    });
+    return true;
+  }
+
+  if (draft.step === 'confirm') {
+    await send(chatId, 'Нажмите «Сохранить» или «Отменить» под номером.');
+    return true;
+  }
+
+  return false;
+}
+
+/* --------------------------------------------------------------------------
    Обработка сообщений
    -------------------------------------------------------------------------- */
 
@@ -538,7 +623,7 @@ async function handleMessage(message) {
   if (!text.startsWith('/') && await feedDraft(chatId, message)) return;
 
   if (text === '➕ Добавить товар' || text === '/add') {
-    drafts.set(chatId, { step: 'name', at: Date.now(), data: { images: [], description: '' } });
+    drafts.set(chatId, { kind: 'product', step: 'name', at: Date.now(), data: { images: [], description: '' } });
     return askStep(chatId, 'name');
   }
 
@@ -554,6 +639,10 @@ async function handleMessage(message) {
 
   if (text === '🧾 Заявки' || text === '/orders') {
     return send(chatId, ordersText(), MENU);
+  }
+
+  if (text === '⚙️ Настройки' || text === '/settings') {
+    return send(chatId, settingsText(), SETTINGS_KEYBOARD);
   }
 
   return send(chatId, 'Не понял. Выберите действие кнопкой ниже.', MENU);
@@ -649,6 +738,55 @@ async function handleCallback(query) {
       left.length ? { inline_keyboard: [[{ text: '◀️ К списку', callback_data: 'list:0' }]] } : undefined
     );
     return done('Удалено');
+  }
+
+  if (action === 'wa') {
+    drafts.set(chatId, { kind: 'whatsapp', step: 'number', at: Date.now(), data: {} });
+    await done();
+    return send(
+      chatId,
+      'Пришлите новый номер WhatsApp, на который будут приходить заказы.\n\n' +
+      '<i>Можно с кодом страны — <code>+992 90 140 32 63</code>, можно просто девять цифр.</i>',
+      CANCEL
+    );
+  }
+
+  if (action === 'wasave') {
+    const draft = drafts.get(chatId);
+    if (!draft || draft.kind !== 'whatsapp' || !draft.data.whatsapp) {
+      await edit(chatId, message.message_id, 'Номер потерялся — начните заново.');
+      return done();
+    }
+
+    const settings = store.readSettings();
+    const previous = String(settings.whatsapp || '');
+    settings.whatsapp = draft.data.whatsapp;
+    store.writeSettings(settings);
+    drafts.delete(chatId);
+
+    await edit(
+      chatId,
+      message.message_id,
+      '✅ Готово. Заказы с сайта теперь уходят на <b>' + escapeHtml(prettyPhone(settings.whatsapp)) + '</b>' +
+      (previous && previous !== settings.whatsapp ? '\n\n<i>Прежний номер: ' + escapeHtml(prettyPhone(previous)) + '</i>' : ''),
+      { inline_keyboard: [[{ text: '📞 Показать его и на сайте', callback_data: 'waphone' }]] }
+    );
+    await send(chatId, 'Что дальше?', MENU);
+    return done('Номер сохранён');
+  }
+
+  if (action === 'waphone') {
+    const settings = store.readSettings();
+    settings.phone = prettyPhone(String(settings.whatsapp || ''));
+    store.writeSettings(settings);
+
+    await edit(
+      chatId,
+      message.message_id,
+      '✅ Заказы уходят на <b>' + escapeHtml(prettyPhone(String(settings.whatsapp || ''))) + '</b>\n' +
+      'Этот же номер теперь показан на сайте как контактный.'
+    );
+    return done('Готово');
   }
 
   if (action === 'save') {

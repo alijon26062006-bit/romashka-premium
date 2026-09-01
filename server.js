@@ -545,7 +545,9 @@ app.post('/api/orders', function (req, res) {
   orders.unshift(order);
   writeOrders(orders);
 
-  res.json({ ok: true, id: order.id, total });
+  /* Возвращаем актуальный номер: страница могла быть открыта до того, как
+     владелец сменил его из телеграма, и тогда заказ ушёл бы на старый. */
+  res.json({ ok: true, id: order.id, total, whatsapp: readSettings().whatsapp });
 });
 
 /* --------------------------------------------------------------------------

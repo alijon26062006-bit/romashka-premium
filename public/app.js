@@ -29,8 +29,8 @@ function thumb(url, width) {
   return url;
 }
 
-function waUrl(text = 'Здравствуйте! Хочу узнать подробнее о букетах магазина ' + (settings.shopName || 'Ромашка') + ' 🌸') {
-  return 'https://wa.me/' + settings.whatsapp + '?text=' + encodeURIComponent(text);
+function waUrl(text = 'Здравствуйте! Хочу узнать подробнее о букетах магазина ' + (settings.shopName || 'Ромашка') + ' 🌸', number) {
+  return 'https://wa.me/' + (number || settings.whatsapp) + '?text=' + encodeURIComponent(text);
 }
 
 /* --------------------------------------------------------------------------
@@ -272,7 +272,7 @@ function orderText(order, items, total) {
   return parts.join('\n');
 }
 
-function submitOrder(event) {
+async function submitOrder(event) {
   event.preventDefault();
 
   const items = cartDetails();
@@ -294,19 +294,43 @@ function submitOrder(event) {
   const total = items.reduce((s, i) => s + i.qty * Number(i.product.price), 0);
   rememberCustomer(order);
 
-  /* Заявка уходит на сервер до перехода в WhatsApp — владелец видит её,
-     даже если клиент передумает отправлять сообщение. keepalive нужен
-     потому, что страница тут же уходит на wa.me. */
+  const button = $('#checkoutView button[type="submit"]');
+  const label = button.innerHTML;
+  button.disabled = true;
+  button.textContent = 'Отправляем…';
+
+  /* Заявка уходит на сервер до перехода в WhatsApp — владелец видит её, даже
+     если клиент передумает отправлять сообщение. В ответе приходит актуальный
+     номер: страница могла быть открыта до того, как владелец сменил его из
+     телеграма. Ждём недолго — если сервер молчит, уходим на номер, который
+     знали при загрузке. */
+  let number = settings.whatsapp;
+
   try {
-    fetch('/api/orders', {
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), 2500);
+
+    const res = await fetch('/api/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(Object.assign({ items: cart.map(i => ({ id: i.id, qty: i.qty })) }, order)),
-      keepalive: true
-    }).catch(() => {});
-  } catch (e) { /* заказ всё равно уйдёт в WhatsApp */ }
+      keepalive: true,
+      signal: abort.signal
+    });
 
-  location.href = waUrl(orderText(order, items, total));
+    clearTimeout(timer);
+
+    const data = await res.json();
+    if (data && data.whatsapp) {
+      number = data.whatsapp;
+      settings.whatsapp = data.whatsapp;
+    }
+  } catch (e) { /* сеть подвела — заказ всё равно уйдёт в WhatsApp */ }
+
+  button.disabled = false;
+  button.innerHTML = label;
+
+  location.href = waUrl(orderText(order, items, total), number);
 }
 
 /* --------------------------------------------------------------------------

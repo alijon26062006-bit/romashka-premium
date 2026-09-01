@@ -206,6 +206,35 @@ function uploads() {
   assert.ok(last().includes('2 человека'), 'склонение сломано: ' + last());
   console.log('  ✓ склонения верные — «' + last().split('\n')[2] + '»');
 
+  console.log('\nНомер WhatsApp');
+  const before2 = store.readSettings().whatsapp;
+  await step(msg('⚙️ Настройки'), 'Заказы уходят на WhatsApp', 'настройки открываются');
+
+  await step(cb('wa'), 'Пришлите новый номер', 'мастер смены номера запущен');
+  await step(msg('всякая ерунда'), 'Не похоже на номер', 'мусор вместо номера не проходит');
+
+  /* Девять цифр — местный номер, код страны бот добавляет сам. */
+  await step(msg('901403263'), '+992 90 140 32 63', 'девятизначный дополнен кодом 992');
+  assert.equal(store.readSettings().whatsapp, before2, 'до подтверждения ничего не меняется');
+  console.log('  ✓ до подтверждения настройки не тронуты');
+
+  await step(cb('wasave'), 'Заказы с сайта теперь уходят', 'номер сохранён');
+  assert.equal(store.readSettings().whatsapp, '992901403263', 'в настройках должен лежать номер из цифр');
+  console.log('  ✓ в настройках: ' + store.readSettings().whatsapp);
+
+  /* Номер с плюсом, скобками и пробелами — тоже должен разбираться. */
+  await step(cb('wa'), 'Пришлите новый номер', 'мастер запущен снова');
+  await step(msg('+992 (44) 600-70-80'), 'wa.me/992446007080', 'номер с плюсом и скобками разобран');
+  await step(cb('wasave'), 'теперь уходят', 'второй номер сохранён');
+  assert.equal(store.readSettings().whatsapp, '992446007080');
+  console.log('  ✓ смена номера повторяется');
+
+  await step(cb('waphone'), 'показан на сайте как контактный', 'номер показан и на сайте');
+  assert.equal(store.readSettings().phone, '+992 44 600 70 80', 'телефон на сайте: ' + store.readSettings().phone);
+  console.log('  ✓ контактный телефон на сайте: ' + store.readSettings().phone);
+
+  await step(msg('⚙️ Настройки'), '+992 44 600 70 80', 'в настройках виден новый номер');
+
   bot.stop();
   fs.rmSync(SANDBOX, { recursive: true, force: true });
   console.log('\n✅ Все проверки прошли\n');
