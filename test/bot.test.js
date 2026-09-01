@@ -136,6 +136,15 @@ function uploads() {
   console.log('\nДобавление товара по шагам');
   await step(msg('➕ Добавить товар'), 'Шаг 1 из 5', 'шаг 1 — название');
   await step(msg('Тестовый букет'), 'Шаг 2 из 5', 'шаг 2 — категория');
+
+  /* Каталог пуст, но кнопки категорий всё равно должны быть — из готового списка. */
+  const keyboard = sent[sent.length - 1].payload.reply_markup.keyboard;
+  const buttons = keyboard.flat().map(b => b.text);
+  assert.ok(buttons.length > 10, 'категорий кнопками должно быть много, а не ' + buttons.length);
+  assert.ok(buttons.includes('Розы') && buttons.includes('Букеты'), 'нет обычных категорий: ' + buttons.join(', '));
+  assert.ok(buttons.includes('✖️ Отменить'), 'нет кнопки отмены');
+  console.log('  ✓ категорий кнопками: ' + (buttons.length - 1));
+
   await step(msg('Розы'), 'Шаг 3 из 5', 'шаг 3 — цена');
   await step(msg('не число'), 'Не понял цену', 'нечисловая цена не проходит');
   await step(msg('250'), 'Шаг 4 из 5', 'шаг 4 — описание');

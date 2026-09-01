@@ -35,6 +35,7 @@ const ADMIN_IDS = String(process.env.TELEGRAM_ADMIN_IDS || '')
 const POLL_TIMEOUT = 30;              // сколько секунд Telegram держит запрос
 const REQUEST_TIMEOUT = 45 * 1000;    // свой предел — чуть больше, на случай зависшего соединения
 const PAGE_SIZE = 8;                  // товаров на страницу списка
+const MAX_CATEGORY_BUTTONS = 24;      // сколько категорий показываем кнопками
 const DRAFT_TTL = 30 * 60 * 1000;     // незаконченная карточка живёт полчаса
 
 let running = false;
@@ -268,21 +269,42 @@ const STEPS = ['name', 'category', 'price', 'description', 'photo'];
 
 const PROMPTS = {
   name: 'Шаг 1 из 5. Как называется букет?\n\n<i>Например: Нежная ромашка</i>',
-  category: 'Шаг 2 из 5. В какую категорию его поставить?\n\n<i>Выберите готовую кнопкой или напишите новую</i>',
+  category: 'Шаг 2 из 5. В какую категорию его поставить?\n\n<i>Нажмите кнопку ниже или напишите свою категорию — она тоже сохранится и появится в кнопках</i>',
   price: 'Шаг 3 из 5. Сколько стоит? Только число.\n\n<i>Например: 250</i>',
   description: 'Шаг 4 из 5. Короткое описание для карточки.\n\n<i>Или отправьте «-», чтобы пропустить</i>',
   photo: 'Шаг 5 из 5. Пришлите фотографию букета.\n\n<i>Можно отправить ссылку на картинку или «-», чтобы обойтись без фото</i>'
 };
 
+/* Обычные для цветочного магазина категории. Нужны, когда каталог пуст или
+   в нём пока одна-две позиции: иначе на втором шаге кнопок почти нет и всё
+   приходится набирать руками. Свои категории магазина идут первыми. */
+const BASE_CATEGORIES = [
+  'Букеты', 'Розы', 'Ромашки', 'Тюльпаны', 'Пионы', 'Хризантемы',
+  'Лилии', 'Орхидеи', 'Гвоздики', 'Герберы', 'Композиции', 'Корзины',
+  'Коробки', 'Сухоцветы', 'Комнатные растения', 'Свадебные', 'Траурные',
+  'Шары', 'Подарки', 'Сладости'
+];
+
+/* Все категории, какие есть: сначала настоящие из каталога, потом готовые. */
+function allCategories() {
+  const list = [];
+  const add = (name) => {
+    const clean = store.cleanText(name, 60);
+    if (clean && !list.includes(clean)) list.push(clean);
+  };
+
+  store.readProducts().forEach(p => add(p.category));
+  BASE_CATEGORIES.forEach(add);
+
+  return list.slice(0, MAX_CATEGORY_BUTTONS);
+}
+
 function categoryKeyboard() {
-  const seen = [];
-  store.readProducts().forEach(p => {
-    if (p.category && !seen.includes(p.category)) seen.push(p.category);
-  });
+  const categories = allCategories();
 
   const rows = [];
-  for (let i = 0; i < seen.length; i += 2) {
-    rows.push(seen.slice(i, i + 2).map(c => ({ text: c })));
+  for (let i = 0; i < categories.length; i += 2) {
+    rows.push(categories.slice(i, i + 2).map(c => ({ text: c })));
   }
   rows.push([{ text: '✖️ Отменить' }]);
 
@@ -470,7 +492,8 @@ async function refuse(chatId, userId) {
     'Бот запущен, но владелец ещё не назначен.\n\n' +
     'Впишите в файл <code>.env</code> на сервере строку:\n' +
     '<code>TELEGRAM_ADMIN_IDS=' + escapeHtml(userId) + '</code>\n\n' +
-    'и перезапустите магазин: <code>docker compose restart</code>'
+    'и пересоберите магазин той же командой, которой ставили — ' +
+    '<code>./deploy.sh</code> или <code>./deploy-nginx.sh</code>.'
   );
 }
 
