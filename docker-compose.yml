@@ -27,6 +27,21 @@ services:
       - caddy_data:/data
       - caddy_config:/config
 
+  # Нужен только для бесплатного домена DuckDNS с динамическим IP.
+  # Запускается отдельно: docker compose --profile duckdns up -d
+  # deploy.sh включает его сам, если в .env заполнен DUCKDNS_TOKEN.
+  duckdns:
+    image: alpine:3
+    restart: unless-stopped
+    profiles: ["duckdns"]
+    env_file: .env
+    command: >
+      sh -c "apk add --no-cache curl >/dev/null 2>&1;
+             while true; do
+               curl -fsS \"https://www.duckdns.org/update?domains=$${DUCKDNS_SUBDOMAIN}&token=$${DUCKDNS_TOKEN}&ip=\" || echo 'DuckDNS: обновить IP не удалось';
+               sleep 300;
+             done"
+
 volumes:
   caddy_data:
   caddy_config:

@@ -50,9 +50,22 @@ fi
 
 mkdir -p data uploads
 
+# ------------------------------------------------------------------ DuckDNS
+# Бесплатный домен duckdns.org требует периодически сообщать свой IP,
+# если он динамический. Включаем обновление, только когда задан токен.
+PROFILE_ARGS=""
+if grep -qE '^DUCKDNS_TOKEN=.+' .env; then
+  PROFILE_ARGS="--profile duckdns"
+  warn "DuckDNS: включено автообновление IP каждые 5 минут"
+elif [[ "$DOMAIN_ARG" == *.duckdns.org ]]; then
+  warn "Домен DuckDNS указан, но DUCKDNS_TOKEN в .env пуст."
+  warn "Если IP сервера постоянный — так и должно быть, ничего делать не нужно."
+  warn "Если IP меняется — впишите DUCKDNS_SUBDOMAIN и DUCKDNS_TOKEN в .env."
+fi
+
 # ------------------------------------------------------------------ Запуск
 log "Собираю и запускаю проект"
-docker compose up -d --build
+docker compose $PROFILE_ARGS up -d --build
 
 log "Проверяю, что сервер отвечает"
 for i in $(seq 1 30); do
